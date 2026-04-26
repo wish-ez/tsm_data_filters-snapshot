@@ -1,0 +1,33 @@
+# Copy this file to config.yml and fill in the values for your deployment.
+# config.yml is git-ignored.
+
+# TSM OAuth client_id used for the "api_token" grant at
+# https://auth.tradeskillmaster.com/oauth2/token
+tsm_client_id: "00000000-0000-0000-0000-000000000000"
+
+# TSM API token used ONLY by update_realms_cron.py to refresh the realm catalog.
+# End users supply their own token through the web form for live queries.
+api_key_updater: "your-tsm-api-token"
+
+# Path to the realms cache file consumed by the browser.
+# This value is rewritten automatically by update_realms_cron.py on each refresh.
+realms_cache_file: "static/cache/realms.js"
+
+# Cache TTLs (minutes). Lower values mean more live TSM API traffic.
+cache_expire_minutes_ah: 30
+cache_expire_minutes_region: 60
+
+# On-disk cache directories for per-auction-house and per-region JSON snapshots.
+cache_path_ah: "cache_ah/"
+cache_path_regions: "cache_region/"
+
+# Google Analytics measurement id. Leave as an empty string to disable.
+google_tag: ""
+
+# Set to true to force a new cache_version on next start
+# (busts ?version=... query strings on static assets). Auto-resets to false.
+reset_cache: false
+
+# Integer timestamp used as the ?version=... suffix on static assets.
+# Managed by the app; any placeholder value is fine for the first run.
+cache_version: 1

@@ -1,0 +1,777 @@
+{% extends "base.html" %}
+{% block content %}
+<div id="content" class="container-fluid d-flex flex-column justify-content-between">
+    <div class="row justify-content-center">
+        <div class="row justify-content-center">
+            <div class="col-auto tsm-settings my-4">
+                <div class="mb-3 mt-3">
+                    <label for="apiKey" class="form-label">TSM API Key
+                        <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="right"
+                           title="Find your API key in the 'My Account' section of the TSM website. It is not stored or shared.">
+                        </i>
+                    </label>
+                    <input type="text" class="form-control" name="apiKey" id="apiKey" aria-describedby="apiKeyHelp"
+                           required value="{{ cookies['apiKey'] }}">
+                </div>
+                <div class="mb-3">
+                    <label for="gameVersions" class="form-label">WoW version</label>
+                    <select class="form-select" id="gameVersions" aria-label="Select WoW version" required>
+                        <option selected value=""></option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="regions" class="form-label">Region</label>
+                    <select disabled class="form-select" id="regions" aria-label="Select region" required>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="realms" class="form-label">Realm</label>
+                    <select disabled class="form-select" id="realms" aria-label="Select realm name" required>
+                    </select>
+                    <label id="realmsUpdated" for="realms" class="form-label mt-1 mb-0">
+                    </label>
+                </div>
+                <div class="mb-3">
+                    <label for="factions" class="form-label">Faction</label>
+                    <select disabled class="form-select" name="ahId" id="factions" aria-label="Select faction"
+                            required>
+                    </select>
+                </div>
+                <div class="form-check mb-3">
+                    <input type="checkbox" name="settingsRemember" class="form-check-input" id="settingsRemember"
+                           checked>
+                    <label class="form-check-label" for="settingsRemember">Remember in current browser <i
+                            class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="right"
+                            title="Your API key and realm settings will be saved in your browser's cookies and loaded automatically the next time you search"></i></label>
+                </div>
+                <div class="form-check mb-3">
+                    <input type="checkbox" name="forceDataUpdate" class="form-check-input" id="forceDataUpdate">
+                    <label class="form-check-label" for="forceDataUpdate">Force items cache update <i
+                            class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="right"
+                            title="Usually market data is updated every {{ cache_expire_ah }} minutes for the realm and every {{ cache_expire_region }} minutes for the region (according to TSM API limits).
+                                You can force a request for the latest market data, but frequent forced requests slow down responses and may cause TSM to temporarily suspend your API key."></i></label>
+                </div>
+                <div class="form-check mb-3">
+                    <input type="checkbox" name="disableDataUpdate" class="form-check-input" id="disableDataUpdate">
+                    <label class="form-check-label" for="disableDataUpdate">Disable items cache update <i
+                            class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="right"
+                            title="If the TSM data update takes too long you can disable it
+                            (but in this case the realm data will be outdated in {{ cache_expire_ah }} minutes as well as the region data in {{ cache_expire_region }} minutes)."></i></label>
+                </div>
+                <div class="row mb-3 justify-content-center">
+                    <div class="col-auto">
+                        <button type="button" id="resetSettings" class="btn reset-settings-button w-100 {% if not is_any_settings %} invisible {% endif %}">Reset settings <i class="bi bi-x-lg"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-auto tsm-filters my-4">
+                <div class="row white text-center mb-3 my-3">
+                    <h4 class="gold m-0">Filters for TSM items</h4>
+                </div>
+                <hr class="filters-separator"/>
+
+                <div class="row justify-content-center align-items-center my-1">
+                    <div class="col-auto align-self-center">
+                        <span class="col-auto input-group-text tsm-label tsm-filter-label">
+                            Realm Minimal Buyout
+                            <i class="bi bi-question-circle tsm-filter-tooltip-icon mx-2"
+                               id="realmBuyoutTooltip"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="right"
+                               title="Last known minimum buyout price of the item on the selected realm for the selected faction">
+                            </i>
+                        </span>
+                    </div>
+                    <div class="col-auto">
+                        <div class="row justify-content-center">
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">From</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRealmBuyoutMin" id="realmBuyoutGoldMin"
+                                               maxlength="9" type="text" aria-label="Gold"
+                                               class="form-control tsm-input input-g" placeholder="0" value="{{ cookies['realmBuyoutGoldMin'] }}">
+                                        <span class="input-group-text tsm-currency gold">g</span>
+                                        <input clear_button="clearRealmBuyoutMin" id="realmBuyoutSilverMin"
+                                               maxlength="2" type="text" aria-label="Silver"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['realmBuyoutSilverMin'] }}">
+                                        <span class="input-group-text tsm-currency silver">s</span>
+                                        <input clear_button="clearRealmBuyoutMin" id="realmBuyoutCopperMin"
+                                               maxlength="2" type="text" aria-label="Copper"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['realmBuyoutCopperMin'] }}">
+                                        <span class="input-group-text tsm-currency copper">c</span>
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                    <button id="clearRealmBuyoutMin" type="button"
+                                                            class="btn-close btn-close-white tsm-clear-button {% if not cookies['realmBuyoutGoldMin'] and not cookies['realmBuyoutSilverMin'] and not cookies['realmBuyoutCopperMin'] %}invisible{% endif %}"
+                                                            aria-label="Clear"></button>
+                                                </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">To</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRealmBuyoutMax" id="realmBuyoutGoldMax"
+                                               maxlength="9" type="text" aria-label="Gold"
+                                               class="form-control tsm-input input-g" placeholder="0" value="{{ cookies['realmBuyoutGoldMax'] }}">
+                                        <span class="input-group-text tsm-currency gold">g</span>
+                                        <input clear_button="clearRealmBuyoutMax" id="realmBuyoutSilverMax"
+                                               maxlength="2" type="text" aria-label="Silver"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['realmBuyoutSilverMax'] }}">
+                                        <span class="input-group-text tsm-currency silver">s</span>
+                                        <input clear_button="clearRealmBuyoutMax" id="realmBuyoutCopperMax"
+                                               maxlength="2" type="text" aria-label="Copper"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['realmBuyoutCopperMax'] }}">
+                                        <span class="input-group-text tsm-currency copper">c</span>
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                    <button id="clearRealmBuyoutMax" type="button"
+                                                            class="btn-close btn-close-white tsm-clear-button {% if not cookies['realmBuyoutGoldMax'] and not cookies['realmBuyoutSilverMax'] and not cookies['realmBuyoutCopperMax'] %}invisible{% endif %}"
+                                                            aria-label="Clear"></button>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr/>
+
+
+                <div class="row justify-content-center align-items-center my-1">
+                    <div class="col-auto align-self-center">
+                        <span class="col-auto input-group-text tsm-label tsm-filter-label">
+                            Realm Market Value
+                            <i class="bi bi-question-circle tsm-filter-tooltip-icon mx-2"
+                               id="realmMarketTooltip"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="right"
+                               title="Weighted average buyout price of the item for the last 14 days on the selected realm for the selected faction">
+                            </i>
+                        </span>
+                    </div>
+                    <div class="col-auto">
+                        <div class="row justify-content-center">
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">From</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRealmMarketMin" id="realmMarketGoldMin"
+                                               maxlength="9" type="text" aria-label="Gold"
+                                               class="form-control tsm-input input-g" placeholder="0" value="{{ cookies['realmMarketGoldMin'] }}">
+                                        <span class="input-group-text tsm-currency gold">g</span>
+                                        <input clear_button="clearRealmMarketMin" id="realmMarketSilverMin"
+                                               maxlength="2" type="text" aria-label="Silver"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['realmMarketSilverMin'] }}">
+                                        <span class="input-group-text tsm-currency silver">s</span>
+                                        <input clear_button="clearRealmMarketMin" id="realmMarketCopperMin"
+                                               maxlength="2" type="text" aria-label="Copper"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['realmMarketCopperMin'] }}">
+                                        <span class="input-group-text tsm-currency copper">c</span>
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                    <button id="clearRealmMarketMin" type="button"
+                                                            class="btn-close btn-close-white tsm-clear-button {% if not cookies['realmMarketGoldMin'] and not cookies['realmMarketSilverMin'] and not cookies['realmMarketCopperMin'] %}invisible{% endif %}"
+                                                            aria-label="Clear"></button>
+                                                </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">To</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRealmMarketMax" id="realmMarketGoldMax"
+                                               maxlength="9" type="text" aria-label="Gold"
+                                               class="form-control tsm-input input-g" placeholder="0" value="{{ cookies['realmMarketGoldMax'] }}">
+                                        <span class="input-group-text tsm-currency gold">g</span>
+                                        <input clear_button="clearRealmMarketMax" id="realmMarketSilverMax"
+                                               maxlength="2" type="text" aria-label="Silver"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['realmMarketSilverMax'] }}">
+                                        <span class="input-group-text tsm-currency silver">s</span>
+                                        <input clear_button="clearRealmMarketMax" id="realmMarketCopperMax"
+                                               maxlength="2" type="text" aria-label="Copper"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['realmMarketCopperMax'] }}">
+                                        <span class="input-group-text tsm-currency copper">c</span>
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                <button id="clearRealmMarketMax" type="button"
+                                                        class="btn-close btn-close-white tsm-clear-button {% if not cookies['realmMarketGoldMax'] and not cookies['realmMarketSilverMax'] and not cookies['realmMarketCopperMax'] %}invisible{% endif %}"
+                                                        aria-label="Clear"></button>
+                                            </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr/>
+
+
+                <div class="row justify-content-center align-items-center my-1">
+                    <div class="col-auto align-self-center">
+                        <span class="col-auto input-group-text tsm-label tsm-filter-label">
+                            Realm Historical Price
+                            <i class="bi bi-question-circle tsm-filter-tooltip-icon mx-2"
+                               id="realmHistoricalTooltip"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="right"
+                               title="Weighted average buyout price of the item for the last 60 days on the selected realm for the selected faction">
+                            </i>
+                        </span>
+                    </div>
+                    <div class="col-auto">
+                        <div class="row justify-content-center">
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">From</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRealmHistoricalMin" id="realmHistoricalGoldMin"
+                                               maxlength="9" type="text" aria-label="Gold"
+                                               class="form-control tsm-input input-g" placeholder="0" value="{{ cookies['realmHistoricalGoldMin'] }}">
+                                        <span class="input-group-text tsm-currency gold">g</span>
+                                        <input clear_button="clearRealmHistoricalMin" id="realmHistoricalSilverMin"
+                                               maxlength="2" type="text" aria-label="Silver"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['realmHistoricalSilverMin'] }}">
+                                        <span class="input-group-text tsm-currency silver">s</span>
+                                        <input clear_button="clearRealmHistoricalMin" id="realmHistoricalCopperMin"
+                                               maxlength="2" type="text" aria-label="Copper"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['realmHistoricalCopperMin'] }}">
+                                        <span class="input-group-text tsm-currency copper">c</span>
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                <button id="clearRealmHistoricalMin" type="button"
+                                                        class="btn-close btn-close-white tsm-clear-button {% if not cookies['realmHistoricalGoldMin'] and not cookies['realmHistoricalSilverMin'] and not cookies['realmHistoricalCopperMin'] %}invisible{% endif %}"
+                                                        aria-label="Clear"></button>
+                                            </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">To</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRealmHistoricalMax" id="realmHistoricalGoldMax"
+                                               maxlength="9" type="text" aria-label="Gold"
+                                               class="form-control tsm-input input-g" placeholder="0" value="{{ cookies['realmHistoricalGoldMax'] }}">
+                                        <span class="input-group-text tsm-currency gold">g</span>
+                                        <input clear_button="clearRealmHistoricalMax" id="realmHistoricalSilverMax"
+                                               maxlength="2" type="text" aria-label="Silver"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['realmHistoricalSilverMax'] }}">
+                                        <span class="input-group-text tsm-currency silver">s</span>
+                                        <input clear_button="clearRealmHistoricalMax" id="realmHistoricalCopperMax"
+                                               maxlength="2" type="text" aria-label="Copper"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['realmHistoricalCopperMax'] }}">
+                                        <span class="input-group-text tsm-currency copper">c</span>
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                <button id="clearRealmHistoricalMax" type="button"
+                                                        class="btn-close btn-close-white tsm-clear-button {% if not cookies['realmHistoricalGoldMax'] and not cookies['realmHistoricalSilverMax'] and not cookies['realmHistoricalCopperMax'] %}invisible{% endif %}"
+                                                        aria-label="Clear"></button>
+                                            </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr/>
+
+
+                <div class="row justify-content-center align-items-center my-1">
+                    <div class="col-auto align-self-center">
+                        <span class="col-auto input-group-text tsm-label tsm-filter-label">
+                            Realm Auctions Number
+                            <i class="bi bi-question-circle tsm-filter-tooltip-icon mx-2"
+                               id="realmNumAuctionsTooltip"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="right"
+                               title="Last known number of auctions on the selected realm for the selected faction">
+                            </i>
+                        </span>
+                    </div>
+                    <div class="col-auto flex-fill">
+                        <div class="row justify-content-center">
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">From</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRealmNumAuctionsMin" id="realmNumAuctionsMin"
+                                               maxlength="9" type="text" aria-label="Number"
+                                               class="form-control tsm-input input-number" placeholder="0" value="{{ cookies['realmNumAuctionsMin'] }}">
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                <button id="clearRealmNumAuctionsMin" type="button"
+                                                        class="btn-close btn-close-white tsm-clear-button {% if not cookies['realmNumAuctionsMin'] %}invisible{% endif %}"
+                                                        aria-label="Clear"></button>
+                                            </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">To</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRealmNumAuctionsMax" id="realmNumAuctionsMax"
+                                               maxlength="9" type="text" aria-label="Number"
+                                               class="form-control tsm-input input-number" placeholder="0" value="{{ cookies['realmNumAuctionsMax'] }}">
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                <button id="clearRealmNumAuctionsMax" type="button"
+                                                        class="btn-close btn-close-white tsm-clear-button {% if not cookies['realmNumAuctionsMax'] %}invisible{% endif %}"
+                                                        aria-label="Clear"></button>
+                                            </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr/>
+
+
+                <div class="row justify-content-center align-items-center my-1">
+                    <div class="col-auto align-self-center">
+                        <span class="col-auto input-group-text tsm-label tsm-filter-label">
+                            Realm Items Number
+                            <i class="bi bi-question-circle tsm-filter-tooltip-icon mx-2"
+                               id="realmNumItemsTooltip"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="right"
+                               title="Last known number of items on the auction house on the selected realm for the selected faction
+                               (the number may differ from the Realm Auctions Number, for example, if there are 10 stacks of leather by 20 pieces in each,
+                               there will be 10 auctions and 200 items respectively)">
+                            </i>
+                        </span>
+                    </div>
+                    <div class="col-auto flex-fill">
+                        <div class="row justify-content-center">
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">From</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRealmNumItemsMin" id="realmNumItemsMin"
+                                               maxlength="9" type="text" aria-label="Number"
+                                               class="form-control tsm-input input-number" placeholder="0" value="{{ cookies['realmNumItemsMin'] }}">
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                <button id="clearRealmNumItemsMin" type="button"
+                                                        class="btn-close btn-close-white tsm-clear-button {% if not cookies['realmNumItemsMin'] %}invisible{% endif %}"
+                                                        aria-label="Clear"></button>
+                                            </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">To</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRealmNumItemsMax" id="realmNumItemsMax"
+                                               maxlength="9" type="text" aria-label="Number"
+                                               class="form-control tsm-input input-number" placeholder="0" value="{{ cookies['realmNumItemsMax'] }}">
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                <button id="clearRealmNumItemsMax" type="button"
+                                                        class="btn-close btn-close-white tsm-clear-button {% if not cookies['realmNumItemsMax'] %}invisible{% endif %}"
+                                                        aria-label="Clear"></button>
+                                            </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr class="filters-separator"/>
+
+
+                <div class="row justify-content-center align-items-center my-1">
+                    <div class="col-auto align-self-center">
+                        <span class="col-auto input-group-text tsm-label tsm-filter-label">
+                            Region Market Value
+                            <i class="bi bi-question-circle tsm-filter-tooltip-icon mx-2"
+                               id="regionMarketTooltip"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="right"
+                               title="Weighted average buyout price of the item for the last 14 days in the selected region">
+                            </i>
+                        </span>
+                    </div>
+                    <div class="col-auto">
+                        <div class="row justify-content-center">
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">From</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRegionMarketMin" id="regionMarketGoldMin"
+                                               maxlength="9" type="text" aria-label="Gold"
+                                               class="form-control tsm-input input-g" placeholder="0" value="{{ cookies['regionMarketGoldMin'] }}">
+                                        <span class="input-group-text tsm-currency gold">g</span>
+                                        <input clear_button="clearRegionMarketMin" id="regionMarketSilverMin"
+                                               maxlength="2" type="text" aria-label="Silver"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['regionMarketSilverMin'] }}">
+                                        <span class="input-group-text tsm-currency silver">s</span>
+                                        <input clear_button="clearRegionMarketMin" id="regionMarketCopperMin"
+                                               maxlength="2" type="text" aria-label="Copper"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['regionMarketCopperMin'] }}">
+                                        <span class="input-group-text tsm-currency copper">c</span>
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                    <button id="clearRegionMarketMin" type="button"
+                                                            class="btn-close btn-close-white tsm-clear-button {% if not cookies['regionMarketGoldMin'] and not cookies['regionMarketSilverMin'] and not cookies['regionMarketCopperMin'] %}invisible{% endif %}"
+                                                            aria-label="Clear"></button>
+                                                </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">To</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRegionMarketMax" id="regionMarketGoldMax"
+                                               maxlength="9" type="text" aria-label="Gold"
+                                               class="form-control tsm-input input-g" placeholder="0" value="{{ cookies['regionMarketGoldMax'] }}">
+                                        <span class="input-group-text tsm-currency gold">g</span>
+                                        <input clear_button="clearRegionMarketMax" id="regionMarketSilverMax"
+                                               maxlength="2" type="text" aria-label="Silver"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['regionMarketSilverMax'] }}">
+                                        <span class="input-group-text tsm-currency silver">s</span>
+                                        <input clear_button="clearRegionMarketMax" id="regionMarketCopperMax"
+                                               maxlength="2" type="text" aria-label="Copper"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['regionMarketCopperMax'] }}">
+                                        <span class="input-group-text tsm-currency copper">c</span>
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                <button id="clearRegionMarketMax" type="button"
+                                                        class="btn-close btn-close-white tsm-clear-button {% if not cookies['regionMarketGoldMax'] and not cookies['regionMarketSilverMax'] and not cookies['regionMarketCopperMax'] %}invisible{% endif %}"
+                                                        aria-label="Clear"></button>
+                                            </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr/>
+
+
+                <div class="row justify-content-center align-items-center my-1">
+                    <div class="col-auto align-self-center">
+                        <span class="col-auto input-group-text tsm-label tsm-filter-label">
+                            Region Historical Price
+                            <i class="bi bi-question-circle tsm-filter-tooltip-icon mx-2"
+                               id="regionHistoricalTooltip"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="right"
+                               title="Weighted average buyout price of the item for the last 60 days in the selected region">
+                            </i>
+                        </span>
+                    </div>
+                    <div class="col-auto">
+                        <div class="row justify-content-center">
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">From</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRegionHistoricalMin" id="regionHistoricalGoldMin"
+                                               maxlength="9" type="text" aria-label="Gold"
+                                               class="form-control tsm-input input-g" placeholder="0" value="{{ cookies['regionHistoricalGoldMin'] }}">
+                                        <span class="input-group-text tsm-currency gold">g</span>
+                                        <input clear_button="clearRegionHistoricalMin" id="regionHistoricalSilverMin"
+                                               maxlength="2" type="text" aria-label="Silver"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['regionHistoricalSilverMin'] }}">
+                                        <span class="input-group-text tsm-currency silver">s</span>
+                                        <input clear_button="clearRegionHistoricalMin" id="regionHistoricalCopperMin"
+                                               maxlength="2" type="text" aria-label="Copper"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['regionHistoricalCopperMin'] }}">
+                                        <span class="input-group-text tsm-currency copper">c</span>
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                <button id="clearRegionHistoricalMin" type="button"
+                                                        class="btn-close btn-close-white tsm-clear-button {% if not cookies['regionHistoricalGoldMin'] and not cookies['regionHistoricalSilverMin'] and not cookies['regionHistoricalCopperMin'] %}invisible{% endif %}"
+                                                        aria-label="Clear"></button>
+                                            </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">To</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRegionHistoricalMax" id="regionHistoricalGoldMax"
+                                               maxlength="9" type="text" aria-label="Gold"
+                                               class="form-control tsm-input input-g" placeholder="0" value="{{ cookies['regionHistoricalGoldMax'] }}">
+                                        <span class="input-group-text tsm-currency gold">g</span>
+                                        <input clear_button="clearRegionHistoricalMax" id="regionHistoricalSilverMax"
+                                               maxlength="2" type="text" aria-label="Silver"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['regionHistoricalSilverMax'] }}">
+                                        <span class="input-group-text tsm-currency silver">s</span>
+                                        <input clear_button="clearRegionHistoricalMax" id="regionHistoricalCopperMax"
+                                               maxlength="2" type="text" aria-label="Copper"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['regionHistoricalCopperMax'] }}">
+                                        <span class="input-group-text tsm-currency copper">c</span>
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                <button id="clearRegionHistoricalMax" type="button"
+                                                        class="btn-close btn-close-white tsm-clear-button {% if not cookies['regionHistoricalGoldMax'] and not cookies['regionHistoricalSilverMax'] and not cookies['regionHistoricalCopperMax'] %}invisible{% endif %}"
+                                                        aria-label="Clear"></button>
+                                            </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr/>
+
+
+                <div class="row justify-content-center align-items-center my-1">
+                    <div class="col-auto align-self-center">
+                        <span class="col-auto input-group-text tsm-label tsm-filter-label">
+                            Region Average Price
+                            <i class="bi bi-question-circle tsm-filter-tooltip-icon mx-2"
+                               id="regionAvgSaleTooltip"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="right"
+                               title="Average sale and purchase price of the item in the selected region. This data is collected from TSM Accounting data via the TSM Desktop Application">
+                            </i>
+                        </span>
+                    </div>
+                    <div class="col-auto">
+                        <div class="row justify-content-center">
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">From</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRegionAvgSaleMin" id="regionAvgSaleGoldMin"
+                                               maxlength="9" type="text" aria-label="Gold"
+                                               class="form-control tsm-input input-g" placeholder="0" value="{{ cookies['regionAvgSaleGoldMin'] }}">
+                                        <span class="input-group-text tsm-currency gold">g</span>
+                                        <input clear_button="clearRegionAvgSaleMin" id="regionAvgSaleSilverMin"
+                                               maxlength="2" type="text" aria-label="Silver"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['regionAvgSaleSilverMin'] }}">
+                                        <span class="input-group-text tsm-currency silver">s</span>
+                                        <input clear_button="clearRegionAvgSaleMin" id="regionAvgSaleCopperMin"
+                                               maxlength="2" type="text" aria-label="Copper"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['regionAvgSaleCopperMin'] }}">
+                                        <span class="input-group-text tsm-currency copper">c</span>
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                    <button id="clearRegionAvgSaleMin" type="button"
+                                                            class="btn-close btn-close-white tsm-clear-button {% if not cookies['regionAvgSaleGoldMin'] and not cookies['regionAvgSaleSilverMin'] and not cookies['regionAvgSaleCopperMin'] %}invisible{% endif %}"
+                                                            aria-label="Clear"></button>
+                                                </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">To</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRegionAvgSaleMax" id="regionAvgSaleGoldMax"
+                                               maxlength="9" type="text" aria-label="Gold"
+                                               class="form-control tsm-input input-g" placeholder="0" value="{{ cookies['regionAvgSaleGoldMax'] }}">
+                                        <span class="input-group-text tsm-currency gold">g</span>
+                                        <input clear_button="clearRegionAvgSaleMax" id="regionAvgSaleSilverMax"
+                                               maxlength="2" type="text" aria-label="Silver"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['regionAvgSaleSilverMax'] }}">
+                                        <span class="input-group-text tsm-currency silver">s</span>
+                                        <input clear_button="clearRegionAvgSaleMax" id="regionAvgSaleCopperMax"
+                                               maxlength="2" type="text" aria-label="Copper"
+                                               class="form-control tsm-input input-s-c" placeholder="0" value="{{ cookies['regionAvgSaleCopperMax'] }}">
+                                        <span class="input-group-text tsm-currency copper">c</span>
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                    <button id="clearRegionAvgSaleMax" type="button"
+                                                            class="btn-close btn-close-white tsm-clear-button {% if not cookies['regionAvgSaleGoldMax'] and not cookies['regionAvgSaleSilverMax'] and not cookies['regionAvgSaleCopperMax'] %}invisible{% endif %}"
+                                                            aria-label="Clear"></button>
+                                                </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr/>
+
+
+                <div class="row justify-content-center align-items-center my-1">
+                    <div class="col-auto align-self-center">
+                        <span class="col-auto input-group-text tsm-label tsm-filter-label">
+                            Region Daily Sold
+                            <i class="bi bi-question-circle tsm-filter-tooltip-icon mx-2"
+                               id="regionDailySoldTooltip"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="right"
+                               title="Decimal average number of items that are sold per day in the selected region">
+                            </i>
+                        </span>
+                    </div>
+                    <div class="col-auto flex-fill">
+                        <div class="row justify-content-center">
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">From</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRegionDailySoldMin" id="regionDailySoldMin"
+                                               maxlength="10" type="text" aria-label="Number"
+                                               class="form-control tsm-input-daily-sold input-number" placeholder="0.000" value="{{ cookies['regionDailySoldMin'] }}">
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                <button id="clearRegionDailySoldMin" type="button"
+                                                        class="btn-close btn-close-white tsm-clear-button {% if not cookies['regionDailySoldMin'] %}invisible{% endif %}"
+                                                        aria-label="Clear"></button>
+                                            </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">To</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRegionDailySoldMax" id="regionDailySoldMax"
+                                               maxlength="10" type="text" aria-label="Number"
+                                               class="form-control tsm-input-daily-sold input-number" placeholder="0.000" value="{{ cookies['regionDailySoldMax'] }}">
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                <button id="clearRegionDailySoldMax" type="button"
+                                                        class="btn-close btn-close-white tsm-clear-button {% if not cookies['regionDailySoldMax'] %}invisible{% endif %}"
+                                                        aria-label="Clear"></button>
+                                            </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr/>
+
+
+                <div class="row justify-content-center align-items-center my-1">
+                    <div class="col-auto align-self-center">
+                        <span class="col-auto input-group-text tsm-label tsm-filter-label">
+                            Region Sale Rate
+                            <i class="bi bi-question-circle tsm-filter-tooltip-icon mx-2"
+                               id="regionSaleRateTooltip"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="right"
+                               title="Decimal from 0 to 1 which indicating the ratio of the number of posted auctions to the number of sold auctions in the region.
+                               For example 0.15 means that 15% of the posted auctions for an item typically sell">
+                            </i>
+                        </span>
+                    </div>
+                    <div class="col-auto flex-fill">
+                        <div class="row justify-content-center">
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">From</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRegionSaleRateMin" id="regionSaleRateMin"
+                                               maxlength="5" type="text" aria-label="Number"
+                                               class="form-control tsm-input-sale-rate input-number" placeholder="0.000" value="{{ cookies['regionSaleRateMin'] }}">
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                <button id="clearRegionSaleRateMin" type="button"
+                                                        class="btn-close btn-close-white tsm-clear-button {% if not cookies['regionSaleRateMin'] %}invisible{% endif %}"
+                                                        aria-label="Clear"></button>
+                                            </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">To</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRegionSaleRateMax" id="regionSaleRateMax"
+                                               maxlength="5" type="text" aria-label="Number"
+                                               class="form-control tsm-input-sale-rate input-number" placeholder="1.000" value="{{ cookies['regionSaleRateMax'] }}">
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                <button id="clearRegionSaleRateMax" type="button"
+                                                        class="btn-close btn-close-white tsm-clear-button {% if not cookies['regionSaleRateMax'] %}invisible{% endif %}"
+                                                        aria-label="Clear"></button>
+                                            </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr/>
+
+
+                <div class="row justify-content-center align-items-center my-1">
+                    <div class="col-auto align-self-center">
+                        <span class="col-auto input-group-text tsm-label tsm-filter-label">
+                            Region Items Number
+                            <i class="bi bi-question-circle tsm-filter-tooltip-icon mx-2"
+                               id="regionNumItemsTooltip"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="right"
+                               title="Last known number of posted items in the selected region">
+                            </i>
+                        </span>
+                    </div>
+                    <div class="col-auto flex-fill">
+                        <div class="row justify-content-center">
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">From</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRegionNumItemsMin" id="regionNumItemsMin"
+                                               maxlength="9" type="text" aria-label="Number"
+                                               class="form-control tsm-input input-number" placeholder="0">
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                <button id="clearRegionNumItemsMin" type="button"
+                                                        class="btn-close btn-close-white tsm-clear-button {% if not cookies['regionNumItemsMin'] %}invisible{% endif %}"
+                                                        aria-label="Clear"></button>
+                                            </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="row justify-content-center">
+                                    <span class="col-auto input-group-text justify-content-end tsm-label tsm-label-width">To</span>
+                                    <div class="col-auto input-group justify-content-end tsm-input-group py-1 px-0">
+                                        <input clear_button="clearRegionNumItemsMax" id="regionNumItemsMax"
+                                               maxlength="9" type="text" aria-label="Number"
+                                               class="form-control tsm-input input-number" placeholder="0">
+                                        <span class="input-group-text tsm-currency bg-transparent">
+                                                <button id="clearRegionNumItemsMax" type="button"
+                                                        class="btn-close btn-close-white tsm-clear-button {% if not cookies['regionNumItemsMax'] %}invisible{% endif %}"
+                                                        aria-label="Clear"></button>
+                                            </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr class="filters-separator"/>
+                <div class="row justify-content-end mt-3">
+                    <div class="col-md-6 mb-3">
+                        <button type="button" id="searchButton" class="btn search-button w-100">
+                            <span>Search <i class="bi bi-search"></i></span>
+                        </button>
+                        <div class="col-auto mt-2 red text-center">
+                            <i class="bi bi-exclamation-triangle"></i> Loading may take up to 1&ndash;2 minutes. <i class="bi bi-exclamation-triangle"></i>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <button type="button" id="resetFilters" class="btn reset-filters-button w-100 {% if not is_any_filters %} invisible {% endif %}">Reset filters
+                            <i class="bi bi-x-lg"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row justify-content-center">
+        <div class="col-auto" id="searchResult">
+            <div class="row" id="searchInfo">
+                <div id="filterStats" class="col-md-4 text-wrap">
+                </div>
+                <div id="cacheStats" class="col-md-8 text-wrap">
+                </div>
+            </div>
+            <div class="row">
+                <table id="table"></table>
+            </div>
+        </div>
+        <div class="col-auto" id="searchError">
+            <div class="row">
+                <div class="col-auto text-wrap py-2" id="searchErrorText"></div>
+                <div class="col-auto search_error_img"></div>
+            </div>
+        </div>
+    </div>
+    <div class="footer row justify-content-center my-3">
+        <div class="col-auto text-center">
+            <a class="m-2" href="https://reddit.com/r/woweconomy/" target="_blank" title="Topic on Reddit" aria-label="Topic on Reddit"><img src="/static/img/reddit_logo.svg"></a>
+            <a class="m-2" href="mailto:contact@tsm-data.com" title="Contact admin" aria-label="Send us email"><img src="/static/img/mail_logo.svg"></a>
+            <a class="m-3" href="https://tradeskillmaster.com" target="_blank" title="Addon for gold making in World of Warcraft" aria-label="Addon for gold making in World of Warcraft"><img src="/static/img/tsm_logo.svg"></a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
